@@ -1,9 +1,10 @@
 """Slackline streak tracking bot."""
 
-from .streaks import StreakTracker, StreakConfig, RecordResult
+from .streaks import RecordResult, StreakConfig, StreakTracker, UserStreak
 
 __all__ = [
     "StreakTracker",
     "StreakConfig",
     "RecordResult",
+    "UserStreak",
 ]

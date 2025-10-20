@@ -1,11 +1,12 @@
 """Core streak tracking logic for Slackline."""
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import date, datetime, timedelta
 import logging
 import sqlite3
 from threading import RLock
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from pathlib import Path
 from typing import Iterable, Optional
 
 from zoneinfo import ZoneInfo
@@ -45,6 +46,18 @@ class RecordResult:
     counted_toward_streak: bool = True
 
 
+@dataclass(frozen=True)
+class UserStreak:
+    """Snapshot of a user's streak statistics."""
+
+    current_streak: int
+    longest_streak: int
+    streak_start_date: Optional[date]
+    last_counted_date: Optional[date]
+    longest_streak_start: Optional[date]
+    longest_streak_end: Optional[date]
+
+
 class StreakTracker:
     """Persisted streak tracking for Slack channels."""
 
@@ -64,7 +77,10 @@ class StreakTracker:
         db_path: str,
         config: Optional[StreakConfig] = None,
     ) -> None:
-        self.db_path = db_path
+        path = Path(db_path)
+        if path.parent and not path.parent.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+        self.db_path = str(path)
         self._config = config or StreakConfig.from_settings()
         self._lock = RLock()
         self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
@@ -322,15 +338,43 @@ class StreakTracker:
         weeks = days // 7
         return f"{weeks} week{'s' if weeks != 1 else ''}"
 
-    def get_streak(self, channel_id: str, user_id: str) -> Optional[int]:
+    def _row_to_user_streak(self, row: sqlite3.Row) -> UserStreak:
+        def parse(value: Optional[str]) -> Optional[date]:
+            return date.fromisoformat(value) if value else None
+
+        return UserStreak(
+            current_streak=int(row["current_streak"]),
+            longest_streak=int(row["longest_streak"]),
+            streak_start_date=parse(row["streak_start_date"]),
+            last_counted_date=parse(row["last_counted_date"]),
+            longest_streak_start=parse(row["longest_streak_start"]),
+            longest_streak_end=parse(row["longest_streak_end"]),
+        )
+
+    def get_user_streak(self, channel_id: str, user_id: str) -> Optional[UserStreak]:
         cursor = self._conn.cursor()
         row = cursor.execute(
-            "SELECT current_streak FROM streaks WHERE channel_id = ? AND user_id = ?",
+            """
+            SELECT current_streak,
+                   longest_streak,
+                   streak_start_date,
+                   last_counted_date,
+                   longest_streak_start,
+                   longest_streak_end
+            FROM streaks
+            WHERE channel_id = ? AND user_id = ?
+            """,
             (channel_id, user_id),
         ).fetchone()
         if row is None:
             return None
-        return int(row["current_streak"])
+        return self._row_to_user_streak(row)
+
+    def get_streak(self, channel_id: str, user_id: str) -> Optional[int]:
+        stats = self.get_user_streak(channel_id, user_id)
+        if stats is None:
+            return None
+        return stats.current_streak
 
     def leaderboard(self, channel_id: str, limit: int = 10) -> list[tuple[str, int]]:
         cursor = self._conn.cursor()

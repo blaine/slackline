@@ -35,6 +35,36 @@ Slackline is a Slack bot that tracks daily posting streaks within a channel. It 
 
 6. Expose the port to Slack (e.g. with ngrok) and update your Slack app's event and command request URLs to point to `/slack/events` and `/slack/commands` respectively.
 
+## Deploying to Fly.io
+
+Slackline ships with a production-ready `Dockerfile` and `fly.toml` that target Fly.io. Adjust the `app` name and `primary_region` in `fly.toml` to match your Fly organization, then deploy:
+
+1. Install the [Fly CLI](https://fly.io/docs/hands-on/install-flyctl/) and authenticate:
+
+   ```bash
+   fly auth login
+   ```
+
+2. (Optional) If you want to keep chat history across deploys, provision a volume for the SQLite database:
+
+   ```bash
+   fly volumes create slackline_data --size 1 --region <region>
+   ```
+
+3. Configure the Slack credentials as Fly secrets:
+
+   ```bash
+   fly secrets set SLACK_BOT_TOKEN=xoxb-... SLACK_SIGNING_SECRET=...
+   ```
+
+4. Deploy the application:
+
+   ```bash
+   fly deploy
+   ```
+
+Fly will build the Docker image, run the container on port `8080`, and mount the persistent volume at `/data` (matching the default `SLACKLINE_DB` value in `fly.toml`). Update the Slack app's event and command URLs to point to your Fly app's hostname under `/slack/events` and `/slack/commands`.
+
 ## Configuration
 
 Slackline reads configuration from environment variables:
@@ -44,6 +74,11 @@ Slackline reads configuration from environment variables:
 - `SLACKLINE_DB` – Path to the SQLite database file (defaults to `slackline.db`).
 - `SLACKLINE_OFF_DAYS` – Comma-separated list of weekday numbers (0=Monday … 6=Sunday) that do not require a post. Example: `5,6` to skip weekends.
 - `SLACKLINE_TZ` – IANA timezone name used when interpreting message timestamps (defaults to `UTC`).
+
+## Slash commands
+
+- `/streak [@user]` – Shows the current streak for you (or the mentioned user) and highlights their personal best so far.
+- `/streak-leaderboard` – Lists the top streak holders for the current channel.
 
 ## Testing
 

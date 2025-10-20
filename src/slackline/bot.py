@@ -10,7 +10,7 @@ from slack_bolt import App
 from slack_bolt.adapter.flask import SlackRequestHandler
 from slack_sdk.errors import SlackApiError
 
-from .streaks import RecordResult, StreakConfig, StreakTracker
+from .streaks import RecordResult, StreakConfig, StreakTracker, UserStreak
 
 logger = logging.getLogger(__name__)
 
@@ -56,13 +56,17 @@ class SlacklineApp:
             ack()
             channel_id = command["channel_id"]
             user_id = command.get("text") or command["user_id"]
-            streak = self.tracker.get_streak(channel_id, user_id)
-            if streak is None or streak == 0:
-                respond(f"<@{user_id}> does not have an active streak yet.")
+            stats = self.tracker.get_user_streak(channel_id, user_id)
+            if stats is None or stats.current_streak == 0:
+                message = f"<@{user_id}> does not have an active streak yet."
+                if stats and stats.longest_streak > 0:
+                    message += (
+                        f" Their longest streak so far is {stats.longest_streak} day"
+                        f"{'s' if stats.longest_streak != 1 else ''}."
+                    )
+                respond(message)
             else:
-                respond(
-                    f"<@{user_id}> is on a {streak}-day streak!"
-                )
+                respond(self._format_streak_message(user_id, stats))
 
         @self.app.command("/streak-leaderboard")
         def show_leaderboard(ack, respond, command):  # type: ignore[no-redef]
@@ -86,6 +90,17 @@ class SlacklineApp:
                 say(result.milestone_message)
             except SlackApiError:
                 logger.exception("Failed to send celebration message")
+
+    def _format_streak_message(self, user_id: str, stats: UserStreak) -> str:
+        message = f"<@{user_id}> is on a {stats.current_streak}-day streak!"
+        if stats.longest_streak > stats.current_streak:
+            message += (
+                f" Their longest streak is {stats.longest_streak} day"
+                f"{'s' if stats.longest_streak != 1 else ''}."
+            )
+        elif stats.longest_streak == stats.current_streak and stats.longest_streak > 0:
+            message += " That's their personal best!"
+        return message
 
 
 def create_app() -> App:
