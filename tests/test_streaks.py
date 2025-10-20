@@ -124,12 +124,13 @@ def test_user_streak_stats_include_longest(tmp_path):
 def test_channel_tracking_configuration(tmp_path):
     tracker = make_tracker(tmp_path)
 
-    assert tracker.is_channel_tracked("C1") is True
-    assert tracker.is_tracking_restricted() is False
+    assert tracker.is_channel_tracked("C1") is False
+    assert tracker.is_tracking_restricted() is True
 
     tracker.enable_channel("C1")
     assert tracker.is_tracking_restricted() is True
     assert tracker.is_channel_tracked("C1") is True
+    assert tracker.tracked_channels() == ["C1"]
     assert tracker.is_channel_tracked("C2") is False
 
     tracker.disable_channel("C1")
