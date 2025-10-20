@@ -141,7 +141,7 @@ class StreakTracker:
                 INSERT OR IGNORE INTO settings (key, value)
                 VALUES ('tracking_mode', ?)
                 """,
-                (self.TRACKING_MODE_ALL,),
+                (self.TRACKING_MODE_LIMITED,),
             )
 
     def close(self) -> None:
@@ -160,7 +160,7 @@ class StreakTracker:
             "SELECT value FROM settings WHERE key = 'tracking_mode'"
         ).fetchone()
         if row is None:
-            return self.TRACKING_MODE_ALL
+            return self.TRACKING_MODE_LIMITED
         return str(row["value"])
 
     def set_tracking_mode(self, mode: str) -> None:

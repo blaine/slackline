@@ -124,14 +124,17 @@ class SlacklineApp:
 
             if action in {"all", "reset", "any"}:
                 self.tracker.reset_channel_tracking()
-                respond("Slackline will track streaks in all channels again.")
+                respond(
+                    "Slackline will track streaks in all channels. "
+                    "Use `/streak-tracking disable` in a channel to return to opt-in mode."
+                )
                 return
 
             if action in {"status", "list"}:
                 if not self.tracker.is_tracking_restricted():
                     respond(
                         "Slackline is tracking streaks in all channels. Run "
-                        "`/streak-tracking enable` in a channel to restrict tracking."
+                        "`/streak-tracking disable` in a channel to return to opt-in tracking."
                     )
                 else:
                     channels = self.tracker.tracked_channels()
@@ -151,7 +154,7 @@ class SlacklineApp:
             current_state = (
                 "tracking all channels"
                 if not self.tracker.is_tracking_restricted()
-                else "tracking only specific channels"
+                else "tracking only opted-in channels"
             )
             respond(
                 "Usage: `/streak-tracking enable|disable|status|all`. "
