@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=67", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slackline"
+version = "0.1.0"
+description = "Slack streak tracking bot"
+authors = [
+  {name = "Slackline Contributors"}
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "Flask>=3.0.0",
+  "slack-bolt>=1.20.0",
+  "slack-sdk>=3.21.0",
+  "python-dotenv>=1.0.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0"
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["slackline"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
