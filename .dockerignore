@@ -1,0 +1,12 @@
+.git
+__pycache__
+*.pyc
+.env
+.env.*
+*.db
+slackline.db
+.tests_cache
+pytest.ini
+.mypy_cache
+.eggs
+*.egg-info

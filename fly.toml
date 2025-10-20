@@ -1,0 +1,23 @@
+# fly.toml app configuration file generated for slackline on Fly.io
+app = "slackline"
+primary_region = "iad"
+kill_signal = "SIGINT"
+kill_timeout = 5
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  SLACKLINE_DB = "/data/slackline.db"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[mounts]]
+  source = "slackline_data"
+  destination = "/data"
