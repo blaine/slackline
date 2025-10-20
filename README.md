@@ -21,18 +21,6 @@ Slackline is a Slack bot that tracks daily posting streaks within a channel. It 
    pip install -e .[dev]
    ```
 
-   > **Note:** If you manage runtimes with [`mise`](https://mise.jdx.dev/) and the
-   > precompiled Python download fails (for example with
-   > `mise error decoding response body`), instruct mise to build Python from
-   > source instead:
-   >
-   > ```bash
-   > mise settings set python_compile 1
-   > mise use -g python@3.11
-   > ```
-   >
-   > Building takes longer, but sidesteps transient CDN download issues.
-
 4. Copy `.env.example` to `.env` and fill in the credentials:
 
    ```bash
