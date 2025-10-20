@@ -1,11 +1,12 @@
 """Core streak tracking logic for Slackline."""
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import date, datetime, timedelta
 import logging
 import sqlite3
 from threading import RLock
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from pathlib import Path
 from typing import Iterable, Optional
 
 from zoneinfo import ZoneInfo
@@ -64,7 +65,10 @@ class StreakTracker:
         db_path: str,
         config: Optional[StreakConfig] = None,
     ) -> None:
-        self.db_path = db_path
+        path = Path(db_path)
+        if path.parent and not path.parent.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+        self.db_path = str(path)
         self._config = config or StreakConfig.from_settings()
         self._lock = RLock()
         self._conn = sqlite3.connect(self.db_path, check_same_thread=False)

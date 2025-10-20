@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta
-import os
+from pathlib import Path
 import sys
 from zoneinfo import ZoneInfo
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from slackline.streaks import RecordResult, StreakConfig, StreakTracker
 
@@ -12,6 +12,18 @@ def make_tracker(tmp_path, off_days=None):
     config = StreakConfig.from_settings(off_days=off_days, timezone="UTC")
     db_path = tmp_path / "streaks.db"
     return StreakTracker(str(db_path), config=config)
+
+
+def test_tracker_creates_parent_directory(tmp_path):
+    nested_dir = tmp_path / "nested" / "more"
+    db_path = nested_dir / "streaks.db"
+    tracker = StreakTracker(str(db_path))
+    try:
+        assert nested_dir.exists()
+        tracker.record_message("C1", "U1")
+    finally:
+        tracker.close()
+    assert Path(db_path).exists()
 
 
 def test_consecutive_days_increment(tmp_path):
