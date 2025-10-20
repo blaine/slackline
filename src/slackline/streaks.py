@@ -61,6 +61,9 @@ class UserStreak:
 class StreakTracker:
     """Persisted streak tracking for Slack channels."""
 
+    TRACKING_MODE_ALL = "all"
+    TRACKING_MODE_LIMITED = "limited"
+
     _MILESTONES = (
         7,
         14,
@@ -118,10 +121,116 @@ class StreakTracker:
                 )
                 """
             )
+            self._conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS tracked_channels (
+                    channel_id TEXT PRIMARY KEY
+                )
+                """
+            )
+            self._conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+                """
+            )
+            self._conn.execute(
+                """
+                INSERT OR IGNORE INTO settings (key, value)
+                VALUES ('tracking_mode', ?)
+                """,
+                (self.TRACKING_MODE_ALL,),
+            )
 
     def close(self) -> None:
         with self._lock:
             self._conn.close()
+
+    # Channel tracking configuration -------------------------------------------------
+
+    def get_tracking_mode(self) -> str:
+        with self._lock:
+            return self._get_tracking_mode_locked()
+
+    def _get_tracking_mode_locked(self) -> str:
+        cursor = self._conn.cursor()
+        row = cursor.execute(
+            "SELECT value FROM settings WHERE key = 'tracking_mode'"
+        ).fetchone()
+        if row is None:
+            return self.TRACKING_MODE_ALL
+        return str(row["value"])
+
+    def set_tracking_mode(self, mode: str) -> None:
+        if mode not in {self.TRACKING_MODE_ALL, self.TRACKING_MODE_LIMITED}:
+            raise ValueError(f"Invalid tracking mode: {mode}")
+        with self._lock:
+            with self._conn:
+                self._conn.execute(
+                    """
+                    INSERT INTO settings (key, value) VALUES ('tracking_mode', ?)
+                    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                    """,
+                    (mode,),
+                )
+                if mode == self.TRACKING_MODE_ALL:
+                    self._conn.execute("DELETE FROM tracked_channels")
+
+    def enable_channel(self, channel_id: str) -> bool:
+        with self._lock:
+            with self._conn:
+                self._conn.execute(
+                    """
+                    INSERT INTO settings (key, value) VALUES ('tracking_mode', ?)
+                    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                    """,
+                    (self.TRACKING_MODE_LIMITED,),
+                )
+                cursor = self._conn.execute(
+                    """
+                    INSERT OR IGNORE INTO tracked_channels (channel_id)
+                    VALUES (?)
+                    """,
+                    (channel_id,),
+                )
+        return cursor.rowcount > 0
+
+    def disable_channel(self, channel_id: str) -> bool:
+        with self._lock:
+            with self._conn:
+                cursor = self._conn.execute(
+                    "DELETE FROM tracked_channels WHERE channel_id = ?",
+                    (channel_id,),
+                )
+        return cursor.rowcount > 0
+
+    def tracked_channels(self) -> list[str]:
+        with self._lock:
+            cursor = self._conn.cursor()
+            rows = cursor.execute(
+                "SELECT channel_id FROM tracked_channels ORDER BY channel_id"
+            ).fetchall()
+            return [str(row["channel_id"]) for row in rows]
+
+    def is_channel_tracked(self, channel_id: str) -> bool:
+        with self._lock:
+            if self._get_tracking_mode_locked() == self.TRACKING_MODE_ALL:
+                return True
+            cursor = self._conn.cursor()
+            row = cursor.execute(
+                "SELECT 1 FROM tracked_channels WHERE channel_id = ?",
+                (channel_id,),
+            ).fetchone()
+            return row is not None
+
+    def is_tracking_restricted(self) -> bool:
+        with self._lock:
+            return self._get_tracking_mode_locked() == self.TRACKING_MODE_LIMITED
+
+    def reset_channel_tracking(self) -> None:
+        self.set_tracking_mode(self.TRACKING_MODE_ALL)
 
     def record_message(
         self,
