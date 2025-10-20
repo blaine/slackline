@@ -79,6 +79,7 @@ Slackline reads configuration from environment variables:
 
 - `/streak [@user]` – Shows the current streak for you (or the mentioned user) and highlights their personal best so far.
 - `/streak-leaderboard` – Lists the top streak holders for the current channel.
+- `/streak-tracking [enable|disable|status|all]` – Configure whether Slackline tracks streaks in the current channel or across all channels. By default all channels are tracked; `enable` switches Slackline to opt-in tracking.
 
 ## Testing
 
