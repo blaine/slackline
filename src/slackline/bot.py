@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import os
 from datetime import datetime, time
-from typing import Iterable, Optional
+from typing import Optional
 
 from zoneinfo import ZoneInfo
 
@@ -21,19 +21,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
-
-REQUIRED_BOT_SCOPES: frozenset[str] = frozenset(
-    {
-        "app_mentions:read",
-        "channels:history",
-        "channels:read",
-        "chat:write",
-        "commands",
-        "groups:history",
-        "groups:read",
-    }
-)
 
 
 class SlacklineApp:
@@ -86,57 +73,8 @@ class SlacklineApp:
     def _run_startup_checks(self) -> None:
         """Run diagnostic checks to ensure the Slack app is ready."""
 
-        self._verify_scopes(REQUIRED_BOT_SCOPES)
         self._log_accessible_channels()
         self._sync_tracked_channels()
-
-    def _verify_scopes(self, required_scopes: Iterable[str]) -> None:
-        """Verify that the bot token has the scopes it expects."""
-
-        required = set(required_scopes)
-        try:
-            # auth.scopes is only available via the generic api_call helper in
-            # the version of slack_sdk that Slackline depends on.
-            response = self.app.client.api_call("auth.scopes")
-        except SlackApiError:
-            logger.exception("Unable to verify Slack scopes during startup")
-            raise
-
-        granted = self._extract_scopes_from_response(response)
-        missing = sorted(required - granted)
-        extra = sorted(granted - required)
-        logger.info(
-            "Verified Slack scopes",
-            extra={
-                "granted_scopes": sorted(granted),
-                "missing_scopes": missing,
-                "unexpected_scopes": extra,
-            },
-        )
-        if missing:
-            raise RuntimeError(
-                "Missing required Slack scopes: " + ", ".join(missing)
-            )
-
-    @staticmethod
-    def _extract_scopes_from_response(response: dict) -> set[str]:
-        """Normalise the scopes returned by Slack's API into a flat set."""
-
-        scopes = response.get("scopes") if isinstance(response, dict) else None
-        granted: set[str] = set()
-
-        if isinstance(scopes, dict):
-            for scope_group in scopes.values():
-                if isinstance(scope_group, list):
-                    granted.update(scope for scope in scope_group if isinstance(scope, str))
-                elif isinstance(scope_group, str):
-                    granted.add(scope_group)
-        elif isinstance(scopes, list):
-            granted.update(scope for scope in scopes if isinstance(scope, str))
-        elif isinstance(scopes, str):
-            granted.add(scopes)
-
-        return granted
 
     def _log_accessible_channels(self) -> None:
         """Log the channels that the bot can access and those it tracks."""
