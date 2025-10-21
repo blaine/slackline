@@ -95,12 +95,12 @@ class SlacklineApp:
 
         required = set(required_scopes)
         try:
-            response = self.app.client.auth_scopes()
+            response = self.app.client.api_call("apps.auth.scopes.list")
         except SlackApiError:
             logger.exception("Unable to verify Slack scopes during startup")
             raise
 
-        granted = set(response.get("scopes", []) or [])
+        granted = self._extract_scopes_from_response(response)
         missing = sorted(required - granted)
         extra = sorted(granted - required)
         logger.info(
@@ -115,6 +115,26 @@ class SlacklineApp:
             raise RuntimeError(
                 "Missing required Slack scopes: " + ", ".join(missing)
             )
+
+    @staticmethod
+    def _extract_scopes_from_response(response: dict) -> set[str]:
+        """Normalise the scopes returned by Slack's API into a flat set."""
+
+        scopes = response.get("scopes") if isinstance(response, dict) else None
+        granted: set[str] = set()
+
+        if isinstance(scopes, dict):
+            for scope_group in scopes.values():
+                if isinstance(scope_group, list):
+                    granted.update(scope for scope in scope_group if isinstance(scope, str))
+                elif isinstance(scope_group, str):
+                    granted.add(scope_group)
+        elif isinstance(scopes, list):
+            granted.update(scope for scope in scopes if isinstance(scope, str))
+        elif isinstance(scopes, str):
+            granted.add(scopes)
+
+        return granted
 
     def _log_accessible_channels(self) -> None:
         """Log the channels that the bot can access and those it tracks."""
