@@ -278,7 +278,7 @@ class SlacklineApp:
     def _log_outgoing_message(channel_id: str, message: str) -> None:
         logger.info(
             "Sending Slack response",
-            extra={"channel_id": channel_id, "message": message},
+            extra={"channel_id": channel_id, "response_text": message},
         )
 
 
