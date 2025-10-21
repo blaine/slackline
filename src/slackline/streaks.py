@@ -214,6 +214,19 @@ class StreakTracker:
             ).fetchall()
             return [str(row["channel_id"]) for row in rows]
 
+    def latest_post_date(self, channel_id: str) -> Optional[date]:
+        """Return the most recent post date recorded for a channel."""
+
+        with self._lock:
+            cursor = self._conn.cursor()
+            row = cursor.execute(
+                "SELECT MAX(post_date) AS last_post FROM posts WHERE channel_id = ?",
+                (channel_id,),
+            ).fetchone()
+            if row is None or row["last_post"] is None:
+                return None
+            return date.fromisoformat(str(row["last_post"]))
+
     def is_channel_tracked(self, channel_id: str) -> bool:
         with self._lock:
             if self._get_tracking_mode_locked() == self.TRACKING_MODE_ALL:
