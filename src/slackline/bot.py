@@ -68,6 +68,7 @@ class SlacklineApp:
     def _register_handlers(self) -> None:
         @self.app.event("message")
         def handle_message(event, say):  # type: ignore[no-redef]
+            logger.info("Received Slack event", extra={"event": event})
             subtype = event.get("subtype")
             if subtype in {"message_changed", "message_deleted", "bot_message"}:
                 return
@@ -77,6 +78,10 @@ class SlacklineApp:
             if not user or not channel or not ts:
                 return
             if not self.tracker.is_channel_tracked(channel):
+                logger.debug(
+                    "Ignoring message in untracked channel",
+                    extra={"channel_id": channel, "user_id": user},
+                )
                 return
 
             result = self.tracker.record_message(channel, user, ts)
@@ -102,12 +107,15 @@ class SlacklineApp:
         @self.app.command("/streak")
         def show_streak(ack, respond, command):  # type: ignore[no-redef]
             ack()
+            logger.info("Received Slack command", extra={"command": command})
             channel_id = command["channel_id"]
             if not self.tracker.is_channel_tracked(channel_id):
-                respond(
+                message = (
                     "Streak tracking is disabled in this channel. "
                     "Run `/streak-tracking enable` to start tracking here."
                 )
+                self._log_outgoing_message(channel_id, message)
+                respond(message)
                 return
             user_id = command.get("text") or command["user_id"]
             stats = self.tracker.get_user_streak(channel_id, user_id)
@@ -118,32 +126,43 @@ class SlacklineApp:
                         f" Their longest streak so far is {stats.longest_streak} day"
                         f"{'s' if stats.longest_streak != 1 else ''}."
                     )
+                self._log_outgoing_message(channel_id, message)
                 respond(message)
             else:
-                respond(self._format_streak_message(user_id, stats))
+                response = self._format_streak_message(user_id, stats)
+                self._log_outgoing_message(channel_id, response)
+                respond(response)
 
         @self.app.command("/streak-leaderboard")
         def show_leaderboard(ack, respond, command):  # type: ignore[no-redef]
             ack()
+            logger.info("Received Slack command", extra={"command": command})
             channel_id = command["channel_id"]
             if not self.tracker.is_channel_tracked(channel_id):
-                respond(
+                message = (
                     "Streak tracking is disabled in this channel. "
                     "Run `/streak-tracking enable` to start tracking here."
                 )
+                self._log_outgoing_message(channel_id, message)
+                respond(message)
                 return
             leaderboard = self.tracker.leaderboard(channel_id)
             if not leaderboard:
-                respond("No streaks recorded yet.")
+                message = "No streaks recorded yet."
+                self._log_outgoing_message(channel_id, message)
+                respond(message)
                 return
             lines = [":trophy: Current streak leaderboard:"]
             for idx, (user_id, streak) in enumerate(leaderboard, start=1):
                 lines.append(f"{idx}. <@{user_id}> — {streak} day{'s' if streak != 1 else ''}")
-            respond("\n".join(lines))
+            message = "\n".join(lines)
+            self._log_outgoing_message(channel_id, message)
+            respond(message)
 
         @self.app.command("/streak-tracking")
         def configure_tracking(ack, respond, command):  # type: ignore[no-redef]
             ack()
+            logger.info("Received Slack command", extra={"command": command})
             channel_id = command["channel_id"]
             text = (command.get("text") or "").strip().lower()
             parts = text.split()
@@ -152,54 +171,66 @@ class SlacklineApp:
             if action in {"enable", "on", "start"}:
                 enabled = self.tracker.enable_channel(channel_id)
                 if enabled:
-                    respond(
+                    message = (
                         "Slackline will now track streaks in this channel. "
                         "Other channels must also opt in to be tracked."
                     )
+                    self._log_outgoing_message(channel_id, message)
+                    respond(message)
                     logger.info("Enabled tracking for channel", extra={"channel_id": channel_id})
                 else:
-                    respond("Streak tracking is already enabled in this channel.")
+                    message = "Streak tracking is already enabled in this channel."
+                    self._log_outgoing_message(channel_id, message)
+                    respond(message)
                 return
 
             if action in {"disable", "off", "stop"}:
                 disabled = self.tracker.disable_channel(channel_id)
                 if disabled:
-                    respond("Slackline will no longer track streaks in this channel.")
+                    message = "Slackline will no longer track streaks in this channel."
+                    self._log_outgoing_message(channel_id, message)
+                    respond(message)
                     logger.info(
                         "Disabled tracking for channel", extra={"channel_id": channel_id}
                     )
                 else:
-                    respond("Streak tracking was already disabled in this channel.")
+                    message = "Streak tracking was already disabled in this channel."
+                    self._log_outgoing_message(channel_id, message)
+                    respond(message)
                 return
 
             if action in {"all", "reset", "any"}:
                 self.tracker.reset_channel_tracking()
-                respond(
-                    "Slackline will track streaks in all channels. "
-                    "Use `/streak-tracking disable` in a channel to return to opt-in mode."
+                message = (
+                    "Slackline now requires each channel to opt in for tracking. "
+                    "I've cleared the tracked channel list; run `/streak-tracking enable` "
+                    "in the channels you want monitored."
                 )
-                logger.info("Reset tracking to include all channels")
+                self._log_outgoing_message(channel_id, message)
+                respond(message)
+                logger.info(
+                    "Cleared tracked channels to enforce opt-in tracking",
+                    extra={"channel_id": channel_id},
+                )
                 return
 
             if action in {"status", "list"}:
-                if not self.tracker.is_tracking_restricted():
-                    respond(
-                        "Slackline is tracking streaks in all channels. Run "
-                        "`/streak-tracking disable` in a channel to return to opt-in tracking."
+                channels = self.tracker.tracked_channels()
+                if not channels:
+                    message = (
+                        "Slackline is currently not tracking any channels. Run "
+                        "`/streak-tracking enable` in a channel to add it."
                     )
+                    self._log_outgoing_message(channel_id, message)
+                    respond(message)
                 else:
-                    channels = self.tracker.tracked_channels()
-                    if not channels:
-                        respond(
-                            "Slackline is currently not tracking any channels. Run "
-                            "`/streak-tracking enable` in a channel to add it."
-                        )
-                    else:
-                        formatted = ", ".join(f"`{cid}`" for cid in channels)
-                        respond(
-                            "Slackline is tracking streaks only in these channels: "
-                            f"{formatted}."
-                        )
+                    formatted = ", ".join(f"`{cid}`" for cid in channels)
+                    message = (
+                        "Slackline is tracking streaks only in these channels: "
+                        f"{formatted}."
+                    )
+                    self._log_outgoing_message(channel_id, message)
+                    respond(message)
                 return
 
             current_state = (
@@ -207,10 +238,12 @@ class SlacklineApp:
                 if not self.tracker.is_tracking_restricted()
                 else "tracking only opted-in channels"
             )
-            respond(
-                "Usage: `/streak-tracking enable|disable|status|all`. "
+            message = (
+                "Usage: `/streak-tracking enable|disable|status|reset`. "
                 f"Slackline is currently {current_state}."
             )
+            self._log_outgoing_message(channel_id, message)
+            respond(message)
 
     def handler(self) -> SlackRequestHandler:
         return SlackRequestHandler(self.app)
@@ -225,6 +258,7 @@ class SlacklineApp:
                 }
             )
             try:
+                self._log_outgoing_message(result.channel_id, result.milestone_message)
                 say(result.milestone_message)
             except SlackApiError:
                 logger.exception("Failed to send celebration message")
@@ -239,6 +273,13 @@ class SlacklineApp:
         elif stats.longest_streak == stats.current_streak and stats.longest_streak > 0:
             message += " That's their personal best!"
         return message
+
+    @staticmethod
+    def _log_outgoing_message(channel_id: str, message: str) -> None:
+        logger.info(
+            "Sending Slack response",
+            extra={"channel_id": channel_id, "message": message},
+        )
 
 
 def create_app() -> App:

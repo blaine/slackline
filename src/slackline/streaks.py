@@ -230,7 +230,16 @@ class StreakTracker:
             return self._get_tracking_mode_locked() == self.TRACKING_MODE_LIMITED
 
     def reset_channel_tracking(self) -> None:
-        self.set_tracking_mode(self.TRACKING_MODE_ALL)
+        with self._lock:
+            with self._conn:
+                self._conn.execute(
+                    """
+                    INSERT INTO settings (key, value) VALUES ('tracking_mode', ?)
+                    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                    """,
+                    (self.TRACKING_MODE_LIMITED,),
+                )
+                self._conn.execute("DELETE FROM tracked_channels")
 
     def record_message(
         self,
