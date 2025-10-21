@@ -36,6 +36,30 @@ class SlacklineApp:
         self.app = App(token=bot_token, signing_secret=signing_secret)
         self._register_handlers()
 
+        logger.info(
+            "Slackline app initialised with database=%s timezone=%s off_days=%s",
+            database_path,
+            timezone,
+            sorted(config.off_days) if config.off_days else [],
+        )
+
+        try:
+            auth_response = self.app.client.auth_test()
+        except SlackApiError:
+            logger.exception("Failed to authenticate Slack client during startup")
+            raise
+        else:
+            logger.info(
+                "Authenticated with Slack",
+                extra={
+                    "team_id": auth_response.get("team_id"),
+                    "team_name": auth_response.get("team"),
+                    "bot_user_id": auth_response.get("bot_user_id"),
+                    "bot_id": auth_response.get("bot_id"),
+                    "url": auth_response.get("url"),
+                },
+            )
+
     def _register_handlers(self) -> None:
         @self.app.event("message")
         def handle_message(event, say):  # type: ignore[no-redef]
@@ -51,6 +75,23 @@ class SlacklineApp:
                 return
 
             result = self.tracker.record_message(channel, user, ts)
+            if result.counted_toward_streak:
+                logger.info(
+                    "Recorded streak activity", extra={
+                        "channel_id": channel,
+                        "user_id": user,
+                        "streak_length": result.streak_length,
+                        "new_day": result.is_new_day,
+                    }
+                )
+            else:
+                logger.debug(
+                    "Message did not count toward streak", extra={
+                        "channel_id": channel,
+                        "user_id": user,
+                        "new_day": result.is_new_day,
+                    }
+                )
             self._maybe_celebrate(result, say)
 
         @self.app.command("/streak")
@@ -110,6 +151,7 @@ class SlacklineApp:
                         "Slackline will now track streaks in this channel. "
                         "Other channels must also opt in to be tracked."
                     )
+                    logger.info("Enabled tracking for channel", extra={"channel_id": channel_id})
                 else:
                     respond("Streak tracking is already enabled in this channel.")
                 return
@@ -118,6 +160,9 @@ class SlacklineApp:
                 disabled = self.tracker.disable_channel(channel_id)
                 if disabled:
                     respond("Slackline will no longer track streaks in this channel.")
+                    logger.info(
+                        "Disabled tracking for channel", extra={"channel_id": channel_id}
+                    )
                 else:
                     respond("Streak tracking was already disabled in this channel.")
                 return
@@ -128,6 +173,7 @@ class SlacklineApp:
                     "Slackline will track streaks in all channels. "
                     "Use `/streak-tracking disable` in a channel to return to opt-in mode."
                 )
+                logger.info("Reset tracking to include all channels")
                 return
 
             if action in {"status", "list"}:
@@ -166,6 +212,13 @@ class SlacklineApp:
 
     def _maybe_celebrate(self, result: RecordResult, say) -> None:
         if result.milestone_message:
+            logger.info(
+                "Celebrating milestone", extra={
+                    "channel_id": result.channel_id,
+                    "user_id": result.user_id,
+                    "streak_length": result.streak_length,
+                }
+            )
             try:
                 say(result.milestone_message)
             except SlackApiError:
