@@ -3,7 +3,10 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Optional
+from datetime import datetime, time
+from typing import Iterable, Optional
+
+from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 from slack_bolt import App
@@ -18,6 +21,19 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+
+REQUIRED_BOT_SCOPES: frozenset[str] = frozenset(
+    {
+        "app_mentions:read",
+        "channels:history",
+        "channels:read",
+        "chat:write",
+        "commands",
+        "groups:history",
+        "groups:read",
+    }
+)
 
 
 class SlacklineApp:
@@ -65,10 +81,184 @@ class SlacklineApp:
                 },
             )
 
+        self._run_startup_checks()
+
+    def _run_startup_checks(self) -> None:
+        """Run diagnostic checks to ensure the Slack app is ready."""
+
+        self._verify_scopes(REQUIRED_BOT_SCOPES)
+        self._log_accessible_channels()
+        self._sync_tracked_channels()
+
+    def _verify_scopes(self, required_scopes: Iterable[str]) -> None:
+        """Verify that the bot token has the scopes it expects."""
+
+        required = set(required_scopes)
+        try:
+            response = self.app.client.auth_scopes()
+        except SlackApiError:
+            logger.exception("Unable to verify Slack scopes during startup")
+            raise
+
+        granted = set(response.get("scopes", []) or [])
+        missing = sorted(required - granted)
+        extra = sorted(granted - required)
+        logger.info(
+            "Verified Slack scopes",
+            extra={
+                "granted_scopes": sorted(granted),
+                "missing_scopes": missing,
+                "unexpected_scopes": extra,
+            },
+        )
+        if missing:
+            raise RuntimeError(
+                "Missing required Slack scopes: " + ", ".join(missing)
+            )
+
+    def _log_accessible_channels(self) -> None:
+        """Log the channels that the bot can access and those it tracks."""
+
+        try:
+            channels: list[dict[str, str]] = []
+            cursor: Optional[str] = None
+            while True:
+                params = {
+                    "types": "public_channel,private_channel",
+                    "limit": 200,
+                }
+                if cursor:
+                    params["cursor"] = cursor
+                response = self.app.client.conversations_list(**params)
+                channels.extend(
+                    {
+                        "id": channel.get("id", ""),
+                        "name": channel.get("name", ""),
+                    }
+                    for channel in response.get("channels", [])
+                )
+                cursor = response.get("response_metadata", {}).get("next_cursor")
+                if not cursor:
+                    break
+        except SlackApiError:
+            logger.exception("Failed to list accessible Slack channels")
+            return
+
+        tracked_channels = self.tracker.tracked_channels()
+        tracked_set = set(tracked_channels)
+        logger.info(
+            "Slack channel visibility confirmed",
+            extra={
+                "accessible_channels": channels,
+                "tracked_channels": tracked_channels,
+                "untracked_accessible_channels": [
+                    channel["id"]
+                    for channel in channels
+                    if channel["id"] and channel["id"] not in tracked_set
+                ],
+            },
+        )
+
+    def _sync_tracked_channels(self) -> None:
+        """Ensure channel history is processed for tracked channels."""
+
+        tracked_channels = self.tracker.tracked_channels()
+        if not tracked_channels:
+            logger.info("No tracked channels to synchronise")
+            return
+
+        logger.info(
+            "Synchronising tracked channel history",
+            extra={"tracked_channels": tracked_channels},
+        )
+        for channel_id in tracked_channels:
+            try:
+                self._sync_single_channel(channel_id)
+            except SlackApiError:
+                logger.exception(
+                    "Failed to synchronise Slack history for channel",
+                    extra={"channel_id": channel_id},
+                )
+
+    def _sync_single_channel(self, channel_id: str) -> None:
+        """Fetch conversation history for a channel and record streak data."""
+
+        latest_date = self.tracker.latest_post_date(channel_id)
+        oldest: Optional[float]
+        if latest_date is None:
+            oldest = None
+        else:
+            start_of_day = datetime.combine(
+                latest_date,
+                time.min,
+                tzinfo=self.tracker.config.timezone,
+            )
+            oldest = start_of_day.astimezone(ZoneInfo("UTC")).timestamp()
+
+        logger.debug(
+            "Fetching Slack history",
+            extra={"channel_id": channel_id, "oldest": oldest},
+        )
+
+        cursor: Optional[str] = None
+        total_processed = 0
+        while True:
+            params = {
+                "channel": channel_id,
+                "limit": 200,
+            }
+            if cursor:
+                params["cursor"] = cursor
+            if oldest is not None:
+                params["oldest"] = oldest
+            response = self.app.client.conversations_history(**params)
+            messages = response.get("messages", [])
+            if not messages:
+                break
+            for message in reversed(messages):
+                if message.get("type") != "message":
+                    continue
+                subtype = message.get("subtype")
+                if subtype in {"message_changed", "message_deleted", "bot_message"}:
+                    continue
+                user = message.get("user")
+                ts = message.get("ts")
+                if not user or not ts:
+                    continue
+                result = self.tracker.record_message(channel_id, user, ts)
+                total_processed += 1
+                if result.counted_toward_streak:
+                    logger.debug(
+                        "Backfilled streak activity",
+                        extra={
+                            "channel_id": channel_id,
+                            "user_id": user,
+                            "streak_length": result.streak_length,
+                            "timestamp": ts,
+                        },
+                    )
+
+            cursor = response.get("response_metadata", {}).get("next_cursor")
+            if not cursor:
+                break
+
+        logger.info(
+            "Slack history synchronised",
+            extra={"channel_id": channel_id, "messages_processed": total_processed},
+        )
+
     def _register_handlers(self) -> None:
         @self.app.event("message")
         def handle_message(event, say):  # type: ignore[no-redef]
-            logger.info("Received Slack event", extra={"event": event})
+            logger.info(
+                "Received Slack message event",
+                extra={
+                    "channel_id": event.get("channel"),
+                    "user_id": event.get("user"),
+                    "ts": event.get("ts"),
+                    "event": event,
+                },
+            )
             subtype = event.get("subtype")
             if subtype in {"message_changed", "message_deleted", "bot_message"}:
                 return

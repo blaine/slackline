@@ -1,0 +1,53 @@
+{
+    "display_information": {
+        "name": "Slackline",
+        "description": "Streaks for Slack",
+        "background_color": "#004d8c"
+    },
+    "features": {
+        "bot_user": {
+            "display_name": "Slackline",
+            "always_online": false
+        },
+        "slash_commands": [
+            {
+                "command": "/streak",
+                "url": "https://slackline.fly.dev/slack/commands",
+                "description": "Shows the current streak for you (or the mentioned user) and highlights their personal best so far.",
+                "usage_hint": "[@user]",
+                "should_escape": false
+            },
+            {
+                "command": "/streak-leaderboard",
+                "url": "https://slackline.fly.dev/slack/commands",
+                "description": " Lists the top streak holders for the current channel.",
+                "should_escape": false
+            },
+            {
+                "command": "/streak-tracking",
+                "url": "https://slackline.fly.dev/slack/commands",
+                "description": "Configure whether Slackline tracks streaks in the current channel or across all channels. By default only channels that run enable are tracked; use all to follow every channel.",
+                "usage_hint": "[enable|disable|status|all]",
+                "should_escape": false
+            }
+        ]
+    },
+    "oauth_config": {
+        "scopes": {
+            "bot": [
+                "app_mentions:read",
+                "channels:history",
+                "channels:read",
+                "chat:write",
+                "commands",
+                "groups:history",
+                "groups:read"
+            ]
+        }
+    },
+    "settings": {
+        "org_deploy_enabled": false,
+        "socket_mode_enabled": false,
+        "token_rotation_enabled": false
+    }
+}
