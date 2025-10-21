@@ -95,7 +95,9 @@ class SlacklineApp:
 
         required = set(required_scopes)
         try:
-            response = self.app.client.api_call("apps.auth.scopes.list")
+            # auth.scopes is only available via the generic api_call helper in
+            # the version of slack_sdk that Slackline depends on.
+            response = self.app.client.api_call("auth.scopes")
         except SlackApiError:
             logger.exception("Unable to verify Slack scopes during startup")
             raise

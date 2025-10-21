@@ -16,8 +16,9 @@ class DummyClient:
 
     def api_call(self, method, **kwargs):
         self.called_methods.append((method, kwargs))
-        assert method == "apps.auth.scopes.list"
-        return self._response
+        if method == "auth.scopes":
+            return self._response
+        raise AssertionError(f"Unexpected API call: {method}")
 
 
 def build_app(response):
@@ -38,7 +39,7 @@ def test_verify_scopes_accepts_union_of_scope_groups():
 
     app._verify_scopes(REQUIRED_BOT_SCOPES)
 
-    assert app.app.client.called_methods == [("apps.auth.scopes.list", {})]
+    assert app.app.client.called_methods == [("auth.scopes", {})]
 
 
 def test_verify_scopes_raises_for_missing_scope():
