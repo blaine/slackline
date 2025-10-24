@@ -19,6 +19,14 @@ try {
 initializeDatabase(dbPath);
 console.log('✅ Database initialized');
 
+// Verify environment variables are set
+console.log('🔍 Environment check:', {
+  SLACK_BOT_TOKEN: process.env.SLACK_BOT_TOKEN ? '✅ Set (length: ' + process.env.SLACK_BOT_TOKEN.length + ')' : '❌ Missing',
+  SLACK_SIGNING_SECRET: process.env.SLACK_SIGNING_SECRET ? '✅ Set (length: ' + process.env.SLACK_SIGNING_SECRET.length + ')' : '❌ Missing',
+  DATABASE_PATH: process.env.DATABASE_PATH || 'using default',
+  NODE_ENV: process.env.NODE_ENV || 'not set'
+});
+
 // Create a custom receiver with health check endpoints
 const receiver = new ExpressReceiver({
   signingSecret: process.env.SLACK_SIGNING_SECRET
@@ -26,7 +34,13 @@ const receiver = new ExpressReceiver({
 
 // Add debug logging for all incoming requests - MUST be first!
 receiver.router.use((req, res, next) => {
-  console.log(`📥 Incoming request: ${req.method} ${req.path}`);
+  console.log(`📥 Incoming request: ${req.method} ${req.path}`, {
+    headers: {
+      'x-slack-signature': req.headers['x-slack-signature']?.substring(0, 20) + '...',
+      'x-slack-request-timestamp': req.headers['x-slack-request-timestamp'],
+      'content-type': req.headers['content-type']
+    }
+  });
   next();
 });
 
