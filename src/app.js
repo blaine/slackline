@@ -24,6 +24,12 @@ const receiver = new ExpressReceiver({
   signingSecret: process.env.SLACK_SIGNING_SECRET
 });
 
+// Add debug logging for all incoming requests - MUST be first!
+receiver.router.use((req, res, next) => {
+  console.log(`📥 Incoming request: ${req.method} ${req.path}`);
+  next();
+});
+
 // Add health check endpoints to the Express router
 // These are just plain HTTP endpoints - no auth required
 receiver.router.get('/health', (req, res) => {
@@ -36,16 +42,10 @@ receiver.router.get('/ready', (req, res) => {
 
 receiver.router.get('/version', (req, res) => {
   res.status(200).json({
-    version: '1.0.1-debug',
+    version: '1.0.2-debug',
     timestamp: new Date().toISOString(),
-    message: 'Debug logging enabled'
+    message: 'Debug logging enabled with correct middleware order'
   });
-});
-
-// Add debug logging for all incoming requests
-receiver.router.use((req, res, next) => {
-  console.log(`📥 Incoming request: ${req.method} ${req.path}`);
-  next();
 });
 
 // Initialize Bolt app with custom receiver
