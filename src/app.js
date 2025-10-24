@@ -47,9 +47,13 @@ const app = new App({
   logLevel: 'DEBUG' // Enable debug logging to see what's happening
 });
 
-// Register message handler
+// Register message handler with error handling
 app.message(async (args) => {
-  await handleMessage(args);
+  try {
+    await handleMessage(args);
+  } catch (error) {
+    console.error('❌ Error in message handler:', error);
+  }
 });
 
 // Register command handler with error handling

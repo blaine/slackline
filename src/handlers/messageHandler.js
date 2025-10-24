@@ -5,14 +5,24 @@ import { checkAchievement, formatAchievementMessage } from '../services/achievem
  * Handle incoming message events from Slack
  */
 export async function handleMessage({ message, say, client }) {
+  console.log('💬 Received message event:', {
+    user: message.user,
+    channel: message.channel,
+    text: message.text?.substring(0, 50),
+    subtype: message.subtype,
+    thread_ts: message.thread_ts
+  });
+
   try {
     // Ignore bot messages and threaded replies
     if (message.subtype || message.thread_ts) {
+      console.log('  ↳ Ignoring: bot message or thread');
       return;
     }
 
     // Ignore messages without user (shouldn't happen, but safety check)
     if (!message.user) {
+      console.log('  ↳ Ignoring: no user');
       return;
     }
 
@@ -35,6 +45,7 @@ export async function handleMessage({ message, say, client }) {
     }
 
     // Process the check-in
+    console.log(`  ↳ Processing check-in for user ${message.user} in channel ${channelName}`);
     const result = processCheckin(
       message.user,
       message.channel,
@@ -44,13 +55,17 @@ export async function handleMessage({ message, say, client }) {
 
     // If not updated (duplicate post today), do nothing
     if (!result.updated) {
+      console.log(`  ↳ No update needed (already posted today), streak: ${result.streakCount}`);
       return;
     }
+
+    console.log(`  ↳ Streak updated! New count: ${result.streakCount}`);
 
     // Check if this is an achievement
     const achievement = checkAchievement(result.streakCount);
 
     if (achievement) {
+      console.log(`  ↳ 🎉 Achievement unlocked at ${result.streakCount} days!`);
       // Post celebration message
       const celebrationMessage = formatAchievementMessage(message.user, achievement);
       await say(celebrationMessage);
