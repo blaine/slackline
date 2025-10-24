@@ -1,4 +1,5 @@
-import { App } from '@slack/bolt';
+import pkg from '@slack/bolt';
+const { App } = pkg;
 import { initializeDatabase } from './database/db.js';
 import { handleMessage } from './handlers/messageHandler.js';
 import { handleCommand } from './handlers/commandHandler.js';
