@@ -21,7 +21,7 @@
   "license": "MIT",
   "dependencies": {
     "@slack/bolt": "^3.17.1",
-    "better-sqlite3": "^9.2.2",
+    "better-sqlite3": "^11.8.1",
     "luxon": "^3.4.4"
   },
   "devDependencies": {

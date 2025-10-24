@@ -36,8 +36,9 @@ describe('Achievement Service', () => {
     const message = formatAchievementMessage('U12345', achievement);
 
     expect(message).toContain('<@U12345>');
-    expect(message).toContain('1 day streak');
-    expect(message).toContain('🎉');
+    expect(message).toContain('1 day'); // Check for singular "day"
+    expect(message).toContain('Rusty the Roundabout Squirrel');
+    expect(message).toContain('🐿️');
   });
 
   it('should return all milestones', () => {

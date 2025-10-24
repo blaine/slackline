@@ -104,9 +104,10 @@ export function checkAchievement(streakCount) {
  * Format achievement celebration message
  */
 export function formatAchievementMessage(userId, achievement) {
+  const dayText = achievement.days === 1 ? 'day' : 'days';
   return `🐿️ *Rusty the Roundabout Squirrel scampers in* 🐿️
 
-HEY <@${userId}>! You've hit **${achievement.days} days** on the slackline!
+HEY <@${userId}>! You've hit **${achievement.days} ${dayText}** on the slackline!
 
 ${achievement.message}`;
 }
