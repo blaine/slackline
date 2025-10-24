@@ -1,5 +1,5 @@
 import pkg from '@slack/bolt';
-const { App } = pkg;
+const { App, ExpressReceiver } = pkg;
 import { initializeDatabase } from './database/db.js';
 import { handleMessage } from './handlers/messageHandler.js';
 import { handleCommand } from './handlers/commandHandler.js';
@@ -19,12 +19,25 @@ try {
 initializeDatabase(dbPath);
 console.log('✅ Database initialized');
 
-// Initialize Bolt app
+// Create a custom receiver with health check endpoints
+const receiver = new ExpressReceiver({
+  signingSecret: process.env.SLACK_SIGNING_SECRET
+});
+
+// Add health check endpoints to the Express router
+// These are just plain HTTP endpoints - no auth required
+receiver.router.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
+receiver.router.get('/ready', (req, res) => {
+  res.status(200).send('READY');
+});
+
+// Initialize Bolt app with custom receiver
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
-  signingSecret: process.env.SLACK_SIGNING_SECRET,
-  socketMode: false,
-  port: process.env.PORT || 3000
+  receiver
 });
 
 // Register message handler
@@ -42,16 +55,6 @@ const port = process.env.PORT || 3000;
 
 (async () => {
   await app.start(port);
-
-  // Health check endpoints (must be added after app.start)
-  app.receiver.router.get('/health', (req, res) => {
-    res.status(200).send('OK');
-  });
-
-  app.receiver.router.get('/ready', (req, res) => {
-    res.status(200).send('READY');
-  });
-
   console.log(`⚡️ Slackline bot is running on port ${port}!`);
 })();
 
