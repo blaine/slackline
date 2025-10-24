@@ -47,49 +47,6 @@ const receiver = new ExpressReceiver({
   signingSecret: process.env.SLACK_SIGNING_SECRET
 });
 
-// Add debug logging to the MAIN Express app (not just router) - MUST be first!
-receiver.app.use((req, res, next) => {
-  console.log(`📥 Incoming request: ${req.method} ${req.path}`, {
-    headers: {
-      'x-slack-signature': req.headers['x-slack-signature']?.substring(0, 20) + '...',
-      'x-slack-request-timestamp': req.headers['x-slack-request-timestamp'],
-      'content-type': req.headers['content-type']
-    }
-  });
-
-  // For slash commands, log the body
-  if (req.path === '/slack/commands' && req.body) {
-    console.log('  📝 Request body:', {
-      command: req.body.command,
-      text: req.body.text,
-      user_id: req.body.user_id,
-      channel_id: req.body.channel_id
-    });
-  }
-
-  // Log when response is sent
-  const originalSend = res.send;
-  const originalJson = res.json;
-
-  res.send = function(data) {
-    console.log(`📤 Response sent for ${req.path}: status=${res.statusCode}, body=${typeof data === 'string' ? data.substring(0, 100) : JSON.stringify(data).substring(0, 100)}`);
-    return originalSend.call(this, data);
-  };
-
-  res.json = function(data) {
-    console.log(`📤 JSON Response sent for ${req.path}: status=${res.statusCode}, data=${JSON.stringify(data).substring(0, 100)}`);
-    return originalJson.call(this, data);
-  };
-
-  next();
-});
-
-// Add error event listener to receiver
-receiver.app.use((err, req, res, next) => {
-  console.error('❌ Express error in receiver:', err);
-  next(err);
-});
-
 // Add health check endpoints to the Express router
 // These are just plain HTTP endpoints - no auth required
 receiver.router.get('/health', (req, res) => {
@@ -102,9 +59,9 @@ receiver.router.get('/ready', (req, res) => {
 
 receiver.router.get('/version', (req, res) => {
   res.status(200).json({
-    version: '1.0.2-debug',
+    version: '1.0.0',
     timestamp: new Date().toISOString(),
-    message: 'Debug logging enabled with correct middleware order'
+    message: 'Slackline bot running'
   });
 });
 
@@ -113,7 +70,7 @@ const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
   receiver,
   logger: logger,
-  logLevel: 'DEBUG' // Enable debug logging to see what's happening
+  logLevel: 'INFO' // Use INFO level for production
 });
 
 // Register message handler with error handling

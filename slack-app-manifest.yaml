@@ -8,7 +8,7 @@ features:
     always_online: true
   slash_commands:
     - command: /slackline
-      url: https://slackline.fly.dev/slack/commands
+      url: https://slackline.fly.dev/slack/events
       description: Manage your streak settings
       usage_hint: help | stats | dayoff <date> | vacation <start> <end>
 oauth_config:
