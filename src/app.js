@@ -43,7 +43,8 @@ receiver.router.use((req, res, next) => {
 // Initialize Bolt app with custom receiver
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
-  receiver
+  receiver,
+  logLevel: 'DEBUG' // Enable debug logging to see what's happening
 });
 
 // Register message handler
@@ -51,14 +52,24 @@ app.message(async (args) => {
   await handleMessage(args);
 });
 
-// Register command handler
+// Register command handler with error handling
 app.command('/slackline', async (args) => {
   console.log('📝 Received /slackline command:', {
     user: args.command.user_id,
     channel: args.command.channel_id,
     text: args.command.text
   });
-  await handleCommand(args);
+  try {
+    await handleCommand(args);
+  } catch (error) {
+    console.error('❌ Error in command handler:', error);
+    throw error;
+  }
+});
+
+// Global error handler
+app.error(async (error) => {
+  console.error('❌ Global error handler caught:', error);
 });
 
 // Start the app

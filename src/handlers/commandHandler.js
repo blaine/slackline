@@ -10,7 +10,12 @@ import { ensureUser } from '../services/streakService.js';
  * Handle /slackline slash command
  */
 export async function handleCommand({ command, ack, respond, client }) {
-  await ack();
+  try {
+    await ack();
+  } catch (error) {
+    console.error('❌ Error acknowledging command:', error);
+    throw error;
+  }
 
   try {
     const subcommand = command.text.trim().split(' ')[0].toLowerCase();
