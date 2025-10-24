@@ -1,0 +1,34 @@
+{
+  "name": "slackline",
+  "version": "1.0.0",
+  "description": "A Slack bot that tracks daily check-in streaks in channels",
+  "main": "src/app.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "node --watch src/app.js",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage"
+  },
+  "keywords": [
+    "slack",
+    "bot",
+    "streaks",
+    "productivity"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@slack/bolt": "^3.17.1",
+    "better-sqlite3": "^9.2.2",
+    "luxon": "^3.4.4"
+  },
+  "devDependencies": {
+    "@vitest/ui": "^1.1.0",
+    "vitest": "^1.1.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

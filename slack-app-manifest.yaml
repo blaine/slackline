@@ -1,0 +1,29 @@
+display_information:
+  name: Slackline
+  description: Track daily check-in streaks with achievement celebrations
+  background_color: "#2c2d30"
+features:
+  bot_user:
+    display_name: Slackline
+    always_online: true
+  slash_commands:
+    - command: /slackline
+      url: https://your-app.fly.dev/slack/commands
+      description: Manage your streak settings
+      usage_hint: help | stats | dayoff <date> | vacation <start> <end>
+oauth_config:
+  scopes:
+    bot:
+      - channels:history
+      - channels:read
+      - chat:write
+      - commands
+      - users:read
+settings:
+  event_subscriptions:
+    request_url: https://your-app.fly.dev/slack/events
+    bot_events:
+      - message.channels
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

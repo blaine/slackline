@@ -1,0 +1,14 @@
+node_modules
+npm-debug.log
+.env
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+data/
+tests/
+docs/
+.git
+.gitignore
+README.md
+vitest.config.js
