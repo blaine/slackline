@@ -48,6 +48,14 @@ receiver.router.use((req, res, next) => {
       'content-type': req.headers['content-type']
     }
   });
+
+  // Log when response is sent
+  const originalSend = res.send;
+  res.send = function(data) {
+    console.log(`📤 Response sent for ${req.path}: status=${res.statusCode}, body=${typeof data === 'string' ? data.substring(0, 100) : JSON.stringify(data).substring(0, 100)}`);
+    originalSend.call(this, data);
+  };
+
   next();
 });
 
@@ -94,10 +102,23 @@ app.command('/slackline', async (args) => {
   });
   try {
     await handleCommand(args);
+    console.log('✅ Command handled successfully');
   } catch (error) {
     console.error('❌ Error in command handler:', error);
     throw error;
   }
+});
+
+// Add middleware to log ALL command attempts (even ones that don't match)
+app.use(async ({ payload, next }) => {
+  if (payload.command) {
+    console.log('🔍 Bolt received command payload:', {
+      command: payload.command,
+      user: payload.user_id,
+      channel: payload.channel_id
+    });
+  }
+  await next();
 });
 
 // Global error handler
