@@ -37,20 +37,21 @@ app.command('/slackline', async (args) => {
   await handleCommand(args);
 });
 
-// Health check endpoint (for Fly.io)
-app.receiver.router.get('/health', (req, res) => {
-  res.status(200).send('OK');
-});
-
-app.receiver.router.get('/ready', (req, res) => {
-  res.status(200).send('READY');
-});
-
 // Start the app
 const port = process.env.PORT || 3000;
 
 (async () => {
   await app.start(port);
+
+  // Health check endpoints (must be added after app.start)
+  app.receiver.router.get('/health', (req, res) => {
+    res.status(200).send('OK');
+  });
+
+  app.receiver.router.get('/ready', (req, res) => {
+    res.status(200).send('READY');
+  });
+
   console.log(`⚡️ Slackline bot is running on port ${port}!`);
 })();
 
