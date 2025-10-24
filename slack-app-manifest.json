@@ -23,6 +23,8 @@
       "bot": [
         "channels:history",
         "channels:read",
+        "groups:history",
+        "groups:read",
         "chat:write",
         "commands",
         "users:read"
@@ -33,7 +35,8 @@
     "event_subscriptions": {
       "request_url": "https://slackline.fly.dev/slack/events",
       "bot_events": [
-        "message.channels"
+        "message.channels",
+        "message.groups"
       ]
     },
     "org_deploy_enabled": false,

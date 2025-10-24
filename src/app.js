@@ -29,7 +29,14 @@ console.log('🔍 Environment check:', {
 
 // Create a custom receiver with health check endpoints
 const receiver = new ExpressReceiver({
-  signingSecret: process.env.SLACK_SIGNING_SECRET
+  signingSecret: process.env.SLACK_SIGNING_SECRET,
+  processBeforeResponse: false // Process async after sending response to Slack
+});
+
+// Add error event listener to receiver
+receiver.app.use((err, req, res, next) => {
+  console.error('❌ Express error in receiver:', err);
+  next(err);
 });
 
 // Add debug logging for all incoming requests - MUST be first!

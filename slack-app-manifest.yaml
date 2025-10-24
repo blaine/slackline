@@ -16,6 +16,8 @@ oauth_config:
     bot:
       - channels:history
       - channels:read
+      - groups:history
+      - groups:read
       - chat:write
       - commands
       - users:read
@@ -24,6 +26,7 @@ settings:
     request_url: https://slackline.fly.dev/slack/events
     bot_events:
       - message.channels
+      - message.groups
   org_deploy_enabled: false
   socket_mode_enabled: false
   token_rotation_enabled: false
