@@ -33,14 +33,8 @@ const receiver = new ExpressReceiver({
   processBeforeResponse: false // Process async after sending response to Slack
 });
 
-// Add error event listener to receiver
-receiver.app.use((err, req, res, next) => {
-  console.error('❌ Express error in receiver:', err);
-  next(err);
-});
-
-// Add debug logging for all incoming requests - MUST be first!
-receiver.router.use((req, res, next) => {
+// Add debug logging to the MAIN Express app (not just router) - MUST be first!
+receiver.app.use((req, res, next) => {
   console.log(`📥 Incoming request: ${req.method} ${req.path}`, {
     headers: {
       'x-slack-signature': req.headers['x-slack-signature']?.substring(0, 20) + '...',
@@ -57,6 +51,12 @@ receiver.router.use((req, res, next) => {
   };
 
   next();
+});
+
+// Add error event listener to receiver
+receiver.app.use((err, req, res, next) => {
+  console.error('❌ Express error in receiver:', err);
+  next(err);
 });
 
 // Add health check endpoints to the Express router
