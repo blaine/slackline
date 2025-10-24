@@ -34,6 +34,14 @@ receiver.router.get('/ready', (req, res) => {
   res.status(200).send('READY');
 });
 
+receiver.router.get('/version', (req, res) => {
+  res.status(200).json({
+    version: '1.0.1-debug',
+    timestamp: new Date().toISOString(),
+    message: 'Debug logging enabled'
+  });
+});
+
 // Add debug logging for all incoming requests
 receiver.router.use((req, res, next) => {
   console.log(`📥 Incoming request: ${req.method} ${req.path}`);
