@@ -3,6 +3,9 @@ const { App, ExpressReceiver } = pkg;
 import { initializeDatabase } from './database/db.js';
 import { handleMessage } from './handlers/messageHandler.js';
 import { handleCommand } from './handlers/commandHandler.js';
+import { buildVacationModal } from './modals/vacationModal.js';
+import { ensureUser } from './services/streakService.js';
+import { addDateRangeDayOff } from './services/daysOffService.js';
 import { mkdir } from 'fs/promises';
 import { dirname } from 'path';
 
@@ -98,16 +101,49 @@ app.command('/slackline', async (args) => {
   }
 });
 
-// Add middleware to log ALL command attempts (even ones that don't match)
-app.use(async ({ payload, next }) => {
-  if (payload.command) {
-    console.log('🔍 Bolt received command payload:', {
-      command: payload.command,
-      user: payload.user_id,
-      channel: payload.channel_id
+// Register shortcut handler to open vacation modal
+app.shortcut('open_vacation_modal', async ({ shortcut, ack, client }) => {
+  await ack();
+
+  try {
+    await client.views.open({
+      trigger_id: shortcut.trigger_id,
+      view: buildVacationModal()
     });
+  } catch (error) {
+    console.error('Error opening vacation modal:', error);
   }
-  await next();
+});
+
+// Handle vacation modal submission
+app.view('vacation_submission', async ({ ack, body, view, client }) => {
+  // Acknowledge the view submission
+  await ack();
+
+  try {
+    // Extract the dates from the modal
+    const startDate = view.state.values.start_date_block.start_date.selected_date;
+    const endDate = view.state.values.end_date_block.end_date.selected_date;
+    const userId = body.user.id;
+
+    // Get user's timezone
+    const userInfo = await client.users.info({ user: userId });
+    const timezone = userInfo.user.tz || 'UTC';
+
+    // Ensure user exists and add the vacation dates
+    const user = ensureUser(userId, timezone);
+    addDateRangeDayOff(user.id, startDate, endDate);
+
+    // Send a confirmation message
+    await client.chat.postMessage({
+      channel: userId,
+      text: `✅ Vacation dates saved! ${startDate} to ${endDate} are marked as days off.`
+    });
+
+    console.log(`User ${userId} set vacation: ${startDate} to ${endDate}`);
+  } catch (error) {
+    console.error('Error handling vacation submission:', error);
+  }
 });
 
 // Global error handler
