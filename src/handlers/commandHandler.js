@@ -5,6 +5,7 @@ import {
   getUserDaysOff
 } from '../services/daysOffService.js';
 import { ensureUser } from '../services/streakService.js';
+import { buildVacationModal } from '../modals/vacationModal.js';
 
 /**
  * Handle /slackline slash command
@@ -65,13 +66,15 @@ async function handleHelp(respond) {
 
 • \`/slackline help\` - Show this help message
 • \`/slackline stats\` - View your current streak and total check-ins
-• \`/slackline settings\` - Open settings modal (coming soon)
+• \`/slackline settings\` - Open vacation date picker
 • \`/slackline dayoff <date>\` - Mark a single day off (YYYY-MM-DD)
   Example: \`/slackline dayoff 2024-12-25\`
 • \`/slackline vacation <start> <end>\` - Mark a vacation range
   Example: \`/slackline vacation 2024-12-20 2024-12-31\`
 • \`/slackline weekends <on|off>\` - Toggle Saturday/Sunday as days off
-• \`/slackline list-daysoff\` - Show your configured days off`,
+• \`/slackline list-daysoff\` - Show your configured days off
+
+_Tip: You can also use the ⚡ shortcuts menu → "Set Vacation Dates"_`,
     response_type: 'ephemeral'
   });
 }
@@ -236,11 +239,17 @@ async function handleListDaysOff(command, respond, client) {
 }
 
 async function handleSettings(command, respond, client) {
-  await respond({
-    text: '⚠️ Settings modal coming soon! For now, use the command-line interface:\n\n' +
-          '• `/slackline weekends on` - Enable weekends as days off\n' +
-          '• `/slackline vacation <start> <end>` - Add vacation dates\n' +
-          '• `/slackline list-daysoff` - View your days off',
-    response_type: 'ephemeral'
-  });
+  try {
+    // Open the vacation modal
+    await client.views.open({
+      trigger_id: command.trigger_id,
+      view: buildVacationModal()
+    });
+  } catch (error) {
+    console.error('Error opening settings modal:', error);
+    await respond({
+      text: '❌ Failed to open settings. Please try again.',
+      response_type: 'ephemeral'
+    });
+  }
 }
