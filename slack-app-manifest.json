@@ -12,7 +12,7 @@
     "slash_commands": [
       {
         "command": "/slackline",
-        "url": "https://your-app.fly.dev/slack/commands",
+        "url": "https://slackline.fly.dev/slack/commands",
         "description": "Manage your streak settings",
         "usage_hint": "help | stats | dayoff <date> | vacation <start> <end>"
       }
@@ -24,13 +24,14 @@
         "channels:history",
         "channels:read",
         "chat:write",
+        "commands",
         "users:read"
       ]
     }
   },
   "settings": {
     "event_subscriptions": {
-      "request_url": "https://your-app.fly.dev/slack/events",
+      "request_url": "https://slackline.fly.dev/slack/events",
       "bot_events": [
         "message.channels"
       ]

@@ -34,6 +34,12 @@ receiver.router.get('/ready', (req, res) => {
   res.status(200).send('READY');
 });
 
+// Add debug logging for all incoming requests
+receiver.router.use((req, res, next) => {
+  console.log(`📥 Incoming request: ${req.method} ${req.path}`);
+  next();
+});
+
 // Initialize Bolt app with custom receiver
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
@@ -47,6 +53,11 @@ app.message(async (args) => {
 
 // Register command handler
 app.command('/slackline', async (args) => {
+  console.log('📝 Received /slackline command:', {
+    user: args.command.user_id,
+    channel: args.command.channel_id,
+    text: args.command.text
+  });
   await handleCommand(args);
 });
 
