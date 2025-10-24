@@ -20,17 +20,31 @@ initializeDatabase(dbPath);
 console.log('✅ Database initialized');
 
 // Verify environment variables are set
+const signingSecretLength = process.env.SLACK_SIGNING_SECRET?.length || 0;
+const signingSecretValid = signingSecretLength === 32;
 console.log('🔍 Environment check:', {
   SLACK_BOT_TOKEN: process.env.SLACK_BOT_TOKEN ? '✅ Set (length: ' + process.env.SLACK_BOT_TOKEN.length + ')' : '❌ Missing',
-  SLACK_SIGNING_SECRET: process.env.SLACK_SIGNING_SECRET ? '✅ Set (length: ' + process.env.SLACK_SIGNING_SECRET.length + ')' : '❌ Missing',
+  SLACK_SIGNING_SECRET: process.env.SLACK_SIGNING_SECRET
+    ? (signingSecretValid ? '✅ Set (32 chars)' : `⚠️ Set but wrong length (${signingSecretLength} chars, expected 32)`)
+    : '❌ Missing',
   DATABASE_PATH: process.env.DATABASE_PATH || 'using default',
   NODE_ENV: process.env.NODE_ENV || 'not set'
 });
 
+// Create custom logger for Bolt to ensure output goes to console
+const logger = {
+  debug: (...msgs) => console.log('[BOLT DEBUG]', ...msgs),
+  info: (...msgs) => console.log('[BOLT INFO]', ...msgs),
+  warn: (...msgs) => console.warn('[BOLT WARN]', ...msgs),
+  error: (...msgs) => console.error('[BOLT ERROR]', ...msgs),
+  setLevel: () => {},
+  getLevel: () => 'DEBUG',
+  setName: () => {}
+};
+
 // Create a custom receiver with health check endpoints
 const receiver = new ExpressReceiver({
-  signingSecret: process.env.SLACK_SIGNING_SECRET,
-  processBeforeResponse: false // Process async after sending response to Slack
+  signingSecret: process.env.SLACK_SIGNING_SECRET
 });
 
 // Add debug logging to the MAIN Express app (not just router) - MUST be first!
@@ -43,11 +57,28 @@ receiver.app.use((req, res, next) => {
     }
   });
 
+  // For slash commands, log the body
+  if (req.path === '/slack/commands' && req.body) {
+    console.log('  📝 Request body:', {
+      command: req.body.command,
+      text: req.body.text,
+      user_id: req.body.user_id,
+      channel_id: req.body.channel_id
+    });
+  }
+
   // Log when response is sent
   const originalSend = res.send;
+  const originalJson = res.json;
+
   res.send = function(data) {
     console.log(`📤 Response sent for ${req.path}: status=${res.statusCode}, body=${typeof data === 'string' ? data.substring(0, 100) : JSON.stringify(data).substring(0, 100)}`);
-    originalSend.call(this, data);
+    return originalSend.call(this, data);
+  };
+
+  res.json = function(data) {
+    console.log(`📤 JSON Response sent for ${req.path}: status=${res.statusCode}, data=${JSON.stringify(data).substring(0, 100)}`);
+    return originalJson.call(this, data);
   };
 
   next();
@@ -77,10 +108,11 @@ receiver.router.get('/version', (req, res) => {
   });
 });
 
-// Initialize Bolt app with custom receiver
+// Initialize Bolt app with custom receiver and logger
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
   receiver,
+  logger: logger,
   logLevel: 'DEBUG' // Enable debug logging to see what's happening
 });
 
