@@ -66,9 +66,13 @@ export async function handleMessage({ message, say, client }) {
 
     if (achievement) {
       console.log(`  ↳ 🎉 Achievement unlocked at ${result.streakCount} days!`);
-      // Post celebration message
+      // Post celebration message as a threaded reply
       const celebrationMessage = formatAchievementMessage(message.user, achievement);
-      await say(celebrationMessage);
+      await client.chat.postMessage({
+        channel: message.channel,
+        thread_ts: message.ts,
+        text: celebrationMessage
+      });
     }
 
   } catch (error) {
